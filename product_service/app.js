@@ -1,30 +1,30 @@
-const express = require('express');
-const cors = require('cors');
-const productRouters = require('./routes/productRoutes');
+    const express = require('express');
+    const cors = require('cors');
+    const productRouters = require('./routes/productRoutes');
 
 
-const app = express();
+    const app = express();
 
 
-app.use(cors());
-app.use(express.json());
+    app.use(cors());
+    app.use(express.json({ limit: '3mb'}));
 
-//endpoint for healthcheck
-app.get('/health', (req, res) => {
-    res.json({
-        status: "Ok",
-        service: "product-services"
+    //endpoint for healthcheck
+    app.get('/health', (req, res) => {
+        res.json({
+            status: "Ok",
+            service: "product-services"
+        });
+
     });
 
-});
+    app.use("/products", productRouters);
 
-app.use("/products", productRouters);
-
-//unknow path
-app.use((req,res) => {
-    res.status(404).json({
-        message: "Endpoint tidak dikenal"
+    //unknow path
+    app.use((req,res) => {
+        res.status(404).json({
+            message: "Endpoint tidak dikenal"
+        });
     });
-});
 
-module.exports = app;
+    module.exports = app;
