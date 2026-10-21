@@ -8,6 +8,11 @@ use Illuminate\Database\Eloquent\Collection;
 
 class CartService
 {
+
+    public function __construct(private ProductService $productService)
+    {
+        
+    }
     /**
      * @return array{user_id: int, items: Collection<int, CartItem>, total_quantity: int}
      */
