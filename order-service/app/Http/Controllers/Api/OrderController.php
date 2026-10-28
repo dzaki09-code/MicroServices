@@ -36,4 +36,19 @@ class OrderController extends Controller
             'data' => $order,
         ], 201);
     }
+
+    public function show(int $id): JsonResponse
+    {
+        $order = order::find($id);
+
+        if (!$order) {
+            return response()->json([
+                'message' => 'Pesanan Tidak ditemukan.',
+            ], 404);
+        }
+
+        return response()->json([
+            'data' => $order,
+        ]);
+    }
 }
