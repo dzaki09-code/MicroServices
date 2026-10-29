@@ -51,4 +51,29 @@ class OrderController extends Controller
             'data' => $order,
         ]);
     }
+
+    public function update(Request $request, int $id): JsonResponse
+    {
+        $order = Order::find($id);
+
+        if (!$order) {
+            return response()->json([
+                'message' => 'Pesanan tidak ditemukan.'
+            ], 404);
+        }
+
+        $validated = $request->validate([
+            'user_id' => ['sometimes', 'required', 'integer', 'min:1'],
+            'total_amount' => ['sometimes', 'required', 'numeric', 'min:0'],
+            'status' => ['sometimes', 'required', 'in:pending,processing,completed,cancelled'],
+            'payment_status' => ['sometimes', 'required', 'in:unpaid,paid,refunded'],
+        ]);
+
+        $order->update($validated);
+
+        return response()->json([
+            'message' => 'Pesanan berhasil diperbarui.' ,
+            'data' => $order->fresh(),
+        ]);
+    }
 }
