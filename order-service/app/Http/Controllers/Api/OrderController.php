@@ -76,4 +76,21 @@ class OrderController extends Controller
             'data' => $order->fresh(),
         ]);
     }
+
+    public function destroy(int $id): JsonResponse
+    {
+        $order = Order::find($id);
+
+        if (!$order) {
+            return response()->json([
+                'message' => 'Pesanan tidak ditemukan.',
+            ], 404);
+        }
+
+        $order->delete();
+
+        return response()->json([
+            'message' => 'Pesanan berhasil dihapus.',
+        ]);
+    }
 }
