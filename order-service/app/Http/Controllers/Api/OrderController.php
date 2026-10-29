@@ -52,45 +52,29 @@ class OrderController extends Controller
         ]);
     }
 
-    public function update(Request $request, int $id): JsonResponse
+    public function userOrders(Request $request, int $userId): JsonResponse
     {
-        $order = Order::find($id);
-
-        if (!$order) {
-            return response()->json([
-                'message' => 'Pesanan tidak ditemukan.'
-            ], 404);
-        }
-
         $validated = $request->validate([
-            'user_id' => ['sometimes', 'required', 'integer', 'min:1'],
-            'total_amount' => ['sometimes', 'required', 'numeric', 'min:0'],
-            'status' => ['sometimes', 'required', 'in:pending,processing,completed,cancelled'],
-            'payment_status' => ['sometimes', 'required', 'in:unpaid,paid,refunded'],
+            'status' => [
+                'sometimes',
+                'required',
+                'string',
+                'in:PENDING,PAID',
+            ],
         ]);
 
-        $order->update($validated);
+        $query = Order::query()
+            ->where('user_id', $userId)
+            ->with('items')
+            ->latest();
 
-        return response()->json([
-            'message' => 'Pesanan berhasil diperbarui.' ,
-            'data' => $order->fresh(),
-        ]);
-    }
-
-    public function destroy(int $id): JsonResponse
-    {
-        $order = Order::find($id);
-
-        if (!$order) {
-            return response()->json([
-                'message' => 'Pesanan tidak ditemukan.',
-            ], 404);
+        if (isset($validated['status'])) {
+            $query->where('status', $validated['status']);
         }
 
-        $order->delete();
-
         return response()->json([
-            'message' => 'Pesanan berhasil dihapus.',
+            'message' => 'Daftar pesanan berhasil diambil.',
+            'data' => $query->get(),
         ]);
     }
 }
