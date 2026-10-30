@@ -2,6 +2,7 @@
 
 namespace App\Clients;
 
+use App\Exceptions\ProductNotFoundException;
 use App\Exceptions\ProductServiceException;
 use Illuminate\Support\Facades\Http;
 use Throwable;
@@ -23,10 +24,7 @@ class ProductServiceClient
                 ->get($this->baseUrl().'/products/'.$productId);
 
             if ($response->status() === 404) {
-                throw new ProductServiceException(
-                    "Produk dengan ID {$productId} tidak ditemukan.",
-                    400
-                );
+                throw new ProductNotFoundException($productId);
             }
 
             if (! $response->successful()) {
@@ -63,12 +61,11 @@ class ProductServiceClient
             }
 
             return $product;
-        } catch (ProductServiceException $e) {
+        } catch (ProductNotFoundException|ProductServiceException $e) {
             throw $e;
         } catch (Throwable $e) {
             throw new ProductServiceException(
                 'Product Service tidak dapat dihubungi.',
-                503,
                 $e
             );
         }

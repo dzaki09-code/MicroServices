@@ -19,19 +19,22 @@ class OrderApiTest extends TestCase
 
     public function test_health_endpoint_returns_service_status(): void
     {
-        $this->getJson('/api/health')
+        $this->getJson('/health')
             ->assertOk()
-            ->assertJsonPath('data.status', 'ok');
+            ->assertExactJson([
+                'status' => 'ok',
+                'service' => 'order-service',
+            ]);
     }
 
     public function test_invalid_checkout_returns_validation_errors(): void
     {
-        $this->postJson('/api/orders', [])
+        $this->postJson('/orders', [])
             ->assertUnprocessable()
             ->assertJsonStructure(['message', 'errors' => ['user_id']]);
     }
 
-    public function test_empty_cart_returns_bad_request(): void
+    public function test_empty_cart_returns_conflict(): void
     {
         $this->mock(CartServiceClient::class, function (MockInterface $mock): void {
             $mock->shouldReceive('getCart')
@@ -40,11 +43,26 @@ class OrderApiTest extends TestCase
                 ->andReturn(['user_id' => 42, 'items' => []]);
         });
 
-        $this->postJson('/api/orders', ['user_id' => 42])
-            ->assertStatus(400)
+        $this->postJson('/orders', ['user_id' => 42])
+            ->assertStatus(409)
             ->assertJsonPath('data', null)
             ->assertJsonPath('message', 'Keranjang kosong. Tambahkan produk sebelum checkout.')
             ->assertJsonPath('errors', null);
+    }
+
+    public function test_service_error_details_are_returned_only_in_debug_mode(): void
+    {
+        $this->mock(CartServiceClient::class, function (MockInterface $mock): void {
+            $mock->shouldReceive('getCart')
+                ->once()
+                ->andThrow(new CartServiceException('technical connection detail'));
+        });
+
+        config(['app.debug' => true]);
+
+        $this->postJson('/orders', ['user_id' => 42])
+            ->assertServiceUnavailable()
+            ->assertJsonPath('message', 'technical connection detail');
     }
 
     public function test_unavailable_cart_service_returns_service_unavailable(): void
@@ -55,14 +73,19 @@ class OrderApiTest extends TestCase
                 ->andThrow(new CartServiceException('connection failed'));
         });
 
-        $this->postJson('/api/orders', ['user_id' => 42])
+        config(['app.debug' => false]);
+
+        $this->postJson('/orders', ['user_id' => 42])
             ->assertServiceUnavailable()
-            ->assertJsonPath('message', 'connection failed')
+            ->assertJsonPath(
+                'message',
+                'Service terkait tidak dapat dihubungi, coba lagi nanti.'
+            )
             ->assertJsonPath('data', null)
             ->assertJsonPath('errors', null);
     }
 
-    public function test_successful_checkout_keeps_order_when_cart_cannot_be_cleared(): void
+    public function test_checkout_returns_service_unavailable_but_keeps_order_when_cart_cannot_be_cleared(): void
     {
         $this->mock(CartServiceClient::class, function (MockInterface $mock): void {
             $mock->shouldReceive('getCart')
@@ -93,11 +116,16 @@ class OrderApiTest extends TestCase
         });
 
         Log::shouldReceive('warning')->once();
+        config(['app.debug' => false]);
 
-        $this->postJson('/api/orders', ['user_id' => 42])
-            ->assertCreated()
-            ->assertJsonPath('data.status', 'PENDING')
-            ->assertJsonPath('data.items.0.quantity', 2);
+        $this->postJson('/orders', ['user_id' => 42])
+            ->assertServiceUnavailable()
+            ->assertJsonPath(
+                'message',
+                'Service terkait tidak dapat dihubungi, coba lagi nanti.'
+            )
+            ->assertJsonPath('data', null)
+            ->assertJsonPath('errors', null);
 
         $this->assertDatabaseHas('orders', [
             'user_id' => 42,
@@ -106,7 +134,7 @@ class OrderApiTest extends TestCase
         $this->assertDatabaseCount('order_items', 1);
     }
 
-    public function test_product_not_found_returns_bad_request(): void
+    public function test_product_not_found_returns_conflict(): void
     {
         $this->mock(CartServiceClient::class, function (MockInterface $mock): void {
             $mock->shouldReceive('getCart')
@@ -123,13 +151,13 @@ class OrderApiTest extends TestCase
             '*' => Http::response(['message' => 'Product not found'], 404),
         ]);
 
-        $this->postJson('/api/orders', ['user_id' => 42])
-            ->assertStatus(400)
+        $this->postJson('/orders', ['user_id' => 42])
+            ->assertStatus(409)
             ->assertJsonPath('message', 'Produk dengan ID 9 tidak ditemukan.')
             ->assertJsonPath('data', null);
     }
 
-    public function test_insufficient_stock_returns_bad_request(): void
+    public function test_insufficient_stock_returns_conflict(): void
     {
         $this->mock(CartServiceClient::class, function (MockInterface $mock): void {
             $mock->shouldReceive('getCart')
@@ -153,22 +181,25 @@ class OrderApiTest extends TestCase
             ]),
         ]);
 
-        $this->postJson('/api/orders', ['user_id' => 42])
-            ->assertStatus(400)
-            ->assertJsonPath('message', 'Stok produk Product tidak mencukupi.')
+        $this->postJson('/orders', ['user_id' => 42])
+            ->assertStatus(409)
+            ->assertJsonPath(
+                'message',
+                'Stok Product tidak mencukupi: diminta 2, tersedia 1.'
+            )
             ->assertJsonPath('data', null);
     }
 
     public function test_invalid_order_status_filter_returns_validation_errors(): void
     {
-        $this->getJson('/api/orders/user/42?status=unknown')
+        $this->getJson('/orders/user/42?status=unknown')
             ->assertUnprocessable()
             ->assertJsonStructure(['message', 'errors' => ['status']]);
     }
 
     public function test_missing_order_returns_not_found(): void
     {
-        $this->getJson('/api/orders/999')
+        $this->getJson('/orders/999')
             ->assertNotFound()
             ->assertJsonPath('data', null);
     }
@@ -182,11 +213,11 @@ class OrderApiTest extends TestCase
             'payment_status' => 'unpaid',
         ]);
 
-        $this->patchJson("/api/orders/{$order->id}/pay")
+        $this->patchJson("/orders/{$order->id}/pay")
             ->assertOk()
             ->assertJsonPath('data.status', 'PAID');
 
-        $this->patchJson("/api/orders/{$order->id}/pay")
+        $this->patchJson("/orders/{$order->id}/pay")
             ->assertStatus(409)
             ->assertJsonPath('data.status', 'PAID');
     }
@@ -199,10 +230,21 @@ class OrderApiTest extends TestCase
                 ->andThrow(new \RuntimeException('private database detail'));
         });
 
-        $this->postJson('/api/orders', ['user_id' => 42])
+        config(['app.debug' => false]);
+
+        $this->postJson('/orders', ['user_id' => 42])
             ->assertInternalServerError()
             ->assertJsonPath('message', 'Terjadi kesalahan internal.')
             ->assertJsonPath('data', null)
             ->assertDontSee('private database detail');
+    }
+
+    public function test_non_numeric_order_id_returns_not_found(): void
+    {
+        $this->getJson('/orders/not-a-number')
+            ->assertNotFound();
+
+        $this->patchJson('/orders/not-a-number/pay')
+            ->assertNotFound();
     }
 }

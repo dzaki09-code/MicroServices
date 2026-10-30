@@ -4,4 +4,4 @@ namespace App\Exceptions;
 
 use RuntimeException;
 
-class OrderBusinessException extends RuntimeException {}
+abstract class OrderBusinessException extends RuntimeException {}

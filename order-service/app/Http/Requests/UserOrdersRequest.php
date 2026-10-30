@@ -21,15 +21,7 @@ class UserOrdersRequest extends FormRequest
                 Rule::in([
                     'PENDING',
                     'PAID',
-                    'PROCESSING',
-                    'COMPLETED',
-                    'CANCELLED',
                 ]),
-            ],
-            'payment_status' => [
-                'sometimes',
-                'string',
-                Rule::in(['unpaid', 'paid', 'refunded']),
             ],
         ];
     }

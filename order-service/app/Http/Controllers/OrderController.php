@@ -85,13 +85,6 @@ class OrderController extends Controller
                 $query->where('status', $validated['status']);
             }
 
-            if (isset($validated['payment_status'])) {
-                $query->where(
-                    'payment_status',
-                    $validated['payment_status']
-                );
-            }
-
             return response()->json([
                 'message' => 'Daftar pesanan berhasil diambil.',
                 'data' => $query->get(),
@@ -141,20 +134,20 @@ class OrderController extends Controller
                 'message' => $exception->getMessage(),
                 'data' => null,
                 'errors' => null,
-            ], 400);
+            ], 409);
         }
 
         if ($exception instanceof ProductServiceException) {
             return response()->json([
-                'message' => $exception->getMessage(),
+                'message' => $this->serviceErrorMessage($exception),
                 'data' => null,
                 'errors' => null,
-            ], $exception->statusCode);
+            ], 503);
         }
 
         if ($exception instanceof CartServiceException) {
             return response()->json([
-                'message' => $exception->getMessage(),
+                'message' => $this->serviceErrorMessage($exception),
                 'data' => null,
                 'errors' => null,
             ], 503);
@@ -165,9 +158,18 @@ class OrderController extends Controller
         ]);
 
         return response()->json([
-            'message' => 'Terjadi kesalahan internal.',
+            'message' => config('app.debug')
+                ? $exception->getMessage()
+                : 'Terjadi kesalahan internal.',
             'data' => null,
             'errors' => null,
         ], 500);
+    }
+
+    private function serviceErrorMessage(Throwable $exception): string
+    {
+        return config('app.debug')
+            ? $exception->getMessage()
+            : 'Service terkait tidak dapat dihubungi, coba lagi nanti.';
     }
 }

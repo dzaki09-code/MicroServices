@@ -5,10 +5,8 @@ use Illuminate\Support\Facades\Route;
 
 Route::get('/health', function () {
     return response()->json([
-        'message' => 'Order Service berjalan dengan baik.',
-        'data' => [
-            'status' => 'ok',
-        ],
+        'status' => 'Order Service berjalan dengan baik',
+        'service' => 'order-service',
     ]);
 });
 

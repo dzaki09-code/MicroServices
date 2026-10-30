@@ -5,7 +5,8 @@ namespace App\Services;
 use App\Clients\CartServiceClient;
 use App\Clients\ProductServiceClient;
 use App\Exceptions\CartServiceException;
-use App\Exceptions\OrderBusinessException;
+use App\Exceptions\InsufficientStockException;
+use App\Exceptions\InvalidCartException;
 use App\Models\Order;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
@@ -24,7 +25,7 @@ class CheckoutService
         $items = $cart['items'];
 
         if (empty($items)) {
-            throw new OrderBusinessException(
+            throw new InvalidCartException(
                 'Keranjang kosong. Tambahkan produk sebelum checkout.'
             );
         }
@@ -43,16 +44,16 @@ class CheckoutService
             );
 
             if ($productId === false || $productId < 1 || $quantity === false || $quantity < 1) {
-                throw new OrderBusinessException(
-                    'Data item pada keranjang tidak valid.'
-                );
+                throw new InvalidCartException;
             }
 
             $product = $this->productClient->getProduct($productId);
 
             if ($quantity > (int) $product['stock']) {
-                throw new OrderBusinessException(
-                    'Stok produk '.$product['name'].' tidak mencukupi.'
+                throw new InsufficientStockException(
+                    (string) $product['name'],
+                    $quantity,
+                    (int) $product['stock']
                 );
             }
 
@@ -97,6 +98,8 @@ class CheckoutService
                 'order_id' => $order->id,
                 'error' => $e->getMessage(),
             ]);
+
+            throw $e;
         }
 
         return $order;
