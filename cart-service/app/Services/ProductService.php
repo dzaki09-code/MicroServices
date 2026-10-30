@@ -2,8 +2,8 @@
 
 namespace App\Services;
 
-use illuminate\Support\Facades\Http;
-use illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Log;
 use Throwable;  
 
 class ProductService
@@ -11,7 +11,7 @@ class ProductService
     public function checkProduct(int $productId): ?array
     {
         try {
-            $response = Http::baseUrl(config('services.products.url'))
+            $response = Http::baseUrl(config('services.products.base_url'))
                 ->get("/products/{$productId}");
 
             if ($response->successful() && isset($response->json()['data'])) {

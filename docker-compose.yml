@@ -1,33 +1,219 @@
 services:
+  # ==========================================
+  # PRODUCT SERVICE
+  # ==========================================
   product-service:
-    build: ./product_service
+    build: ./product-service
     ports:
       - "3000:3000"
     environment:
-      - DB_HOST=product-db
-      - DB_USER=appuser
-      - DB_PASSWORD=apppassword
-      - DB_NAME=product_db
+      DB_HOST: product-db
+      DB_USER: appuser
+      DB_PASSWORD: apppassword
+      DB_NAME: product_db
     depends_on:
       product-db:
         condition: service_healthy
+    healthcheck:
+      test: ["CMD", "node", "-e", "require('http').get('http://127.0.0.1:3000/health', response => process.exit(response.statusCode === 200 ? 0 : 1)).on('error', () => process.exit(1))"]
+      interval: 10s
+      retries: 5
+      start_period: 10s
+      timeout: 5s
+    networks:
+      - microservices-network
 
   product-db:
     image: mysql:8.0
     environment:
-      - MYSQL_DATABASE=product_db
-      - MYSQL_USER=appuser
-      - MYSQL_PASSWORD=apppassword
-      - MYSQL_ROOT_PASSWORD=rootpassword
+      MYSQL_DATABASE: product_db
+      MYSQL_USER: appuser
+      MYSQL_PASSWORD: apppassword
+      MYSQL_ROOT_PASSWORD: rootpassword
     volumes:
       - product-db-data:/var/lib/mysql
-      - ./product_service/database/init.sql:/docker-entrypoint-initdb.d/init.sql
+      - ./product-service/database/init.sql:/docker-entrypoint-initdb.d/init.sql
     healthcheck:
       test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "--user=root", "--password=rootpassword"]
       interval: 10s
       retries: 5
       start_period: 30s
       timeout: 5s
+    networks:
+      - microservices-network
 
+  # ==========================================
+  # CART SERVICE
+  # ==========================================
+  cart-service:
+    build: ./cart-service
+    ports:
+      - "3001:3001"
+    environment:
+      DB_CONNECTION: pgsql
+      DB_HOST: cart-db
+      DB_PORT: 5432
+      DB_DATABASE: cartdb
+      DB_USERNAME: appuser
+      DB_PASSWORD: apppassword
+      PRODUCTS_SERVICE_URL: http://product-service:3000
+      LOG_CHANNEL: stderr
+    depends_on:
+      cart-db:
+        condition: service_healthy
+      product-service:
+        condition: service_healthy
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "php",
+          "-r",
+          "exit(@file_get_contents('http://127.0.0.1:3001/up') === false ? 1 : 0);",
+        ]
+      interval: 10s
+      retries: 5
+      start_period: 30s
+      timeout: 5s
+    networks:
+      - microservices-network
+
+  cart-db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: cartdb
+      POSTGRES_USER: appuser
+      POSTGRES_PASSWORD: apppassword
+    ports:
+      - "5432:5432"
+    volumes:
+      - cart-db-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U appuser -d cartdb"]
+      interval: 10s
+      retries: 5
+      timeout: 5s
+    networks:
+      - microservices-network
+
+  # ==========================================
+  # ORDER SERVICE
+  # ==========================================
+  order-service:
+    build:
+      context: ./order-service
+    ports:
+      - "3003:3003"
+    environment:
+      APP_ENV: production
+      APP_DEBUG: "false"
+      APP_URL: http://localhost:3003
+      LOG_CHANNEL: stderr
+      CACHE_STORE: array
+      SESSION_DRIVER: array
+      QUEUE_CONNECTION: sync
+      DB_CONNECTION: mysql
+      DB_HOST: order-db
+      DB_PORT: 3306
+      DB_DATABASE: order_service
+      DB_USERNAME: order_user
+      DB_PASSWORD: order_password
+      CART_SERVICE_URL: http://cart-service:3001
+      PRODUCT_SERVICE_URL: http://product-service:3000
+    depends_on:
+      order-db:
+        condition: service_healthy
+      cart-service:
+        condition: service_healthy
+      product-service:
+        condition: service_healthy
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "php",
+          "-r",
+          "exit(@file_get_contents('http://127.0.0.1:3003/up') === false ? 1 : 0);",
+        ]
+      interval: 10s
+      retries: 5
+      start_period: 30s
+      timeout: 5s
+    networks:
+      - microservices-network
+
+  order-db:
+    image: mysql:8.4
+    environment:
+      MYSQL_DATABASE: order_service
+      MYSQL_USER: order_user
+      MYSQL_PASSWORD: order_password
+      MYSQL_ROOT_PASSWORD: root_password
+    volumes:
+      - order-db-data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "--user=root", "--password=root_password"]
+      interval: 10s
+      retries: 5
+      start_period: 30s
+      timeout: 5s
+    networks:
+      - microservices-network
+
+  # ==========================================
+  # REVIEW SERVICE
+  # ==========================================
+  review-service:
+    build: ./review-service
+    ports:
+      - "3002:3002"
+    environment:
+      HOST: 0.0.0.0
+      PORT: 3002
+      FLASK_DEBUG: 0
+      MONGO_URI: mongodb://review_user:review_password@review-db:27017/?authSource=admin
+      MONGO_DB_NAME: reviewdb
+      PRODUCT_SERVICE_URL: http://product-service:3000
+    depends_on:
+      review-db:
+        condition: service_healthy
+      product-service:
+        condition: service_healthy
+    networks:
+      - microservices-network
+
+  review-db:
+    image: mongo:7
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: review_user
+      MONGO_INITDB_ROOT_PASSWORD: review_password
+    volumes:
+      - review-db-data:/data/db
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "mongosh --quiet --username \"$$MONGO_INITDB_ROOT_USERNAME\" --password \"$$MONGO_INITDB_ROOT_PASSWORD\" --authenticationDatabase admin --eval \"db.adminCommand('ping').ok\"",
+        ]
+      interval: 10s
+      retries: 5
+      start_period: 10s
+      timeout: 5s
+    networks:
+      - microservices-network
+
+# ==========================================
+# PERSISTENT DATABASE VOLUMES
+# ==========================================
 volumes:
   product-db-data:
+  cart-db-data:
+  order-db-data:
+    name: order-service_order-db-data
+  review-db-data:
+# ==========================================
+# SHARED NETWORK
+# ==========================================
+networks:
+  microservices-network:
+    driver: bridge
