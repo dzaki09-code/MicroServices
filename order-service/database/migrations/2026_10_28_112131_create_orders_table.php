@@ -15,7 +15,7 @@ return new class extends Migration
             $table->id();
             $table->unsignedBigInteger('user_id');
             $table->decimal('total_amount', 12, 2)->default(0);
-            $table->string('status')->default('pending');
+            $table->string('status')->default('PENDING');
             $table->string('payment_status')->default('unpaid');
             $table->timestamps();
 

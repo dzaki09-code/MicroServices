@@ -35,4 +35,17 @@ return [
         ],
     ],
 
+    'cart' => [
+        'base_url' => env(
+            'CART_SERVICE_URL',
+            'http://cart-service:3001'
+        ),
+    ],
+
+    'products' => [
+        'base_url' => env(
+            'PRODUCT_SERVICE_URL',
+            'http://product-service:3000'
+        ),
+    ],
 ];
