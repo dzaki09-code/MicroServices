@@ -2,7 +2,7 @@
 
 namespace App\Clients;
 
-use App\Exceptions\CartServiceException;
+use App\Exceptions\ServiceUnavailableException;
 use Illuminate\Support\Facades\Http;
 use Throwable;
 
@@ -20,35 +20,40 @@ class CartServiceClient
     {
         try {
             $response = Http::timeout(5)
-                ->get($this->baseUrl() . '/carts/' . $userId);
+                ->get($this->baseUrl().'/carts/'.$userId);
 
-            if (!$response->successful()) {
-                throw new CartServiceException(
+            if (! $response->successful()) {
+                throw new ServiceUnavailableException(
+                    'cart-service',
+                    'get_cart',
                     'Cart Service gagal mengambil keranjang. HTTP '
-                    . $response->status()
+                    .$response->status()
                 );
             }
 
             $cart = $response->json('data');
 
             if (
-                !is_array($cart)
-                || !isset($cart['user_id'])
-                || !isset($cart['items'])
-                || !is_array($cart['items'])
+                ! is_array($cart)
+                || ! isset($cart['user_id'])
+                || ! isset($cart['items'])
+                || ! is_array($cart['items'])
             ) {
-                throw new CartServiceException(
+                throw new ServiceUnavailableException(
+                    'cart-service',
+                    'get_cart',
                     'Format respons keranjang tidak valid.'
                 );
             }
 
             return $cart;
-        } catch (CartServiceException $e) {
+        } catch (ServiceUnavailableException $e) {
             throw $e;
         } catch (Throwable $e) {
-            throw new CartServiceException(
+            throw new ServiceUnavailableException(
+                'cart-service',
+                'get_cart',
                 'Cart Service tidak dapat dihubungi.',
-                0,
                 $e
             );
         }
@@ -58,20 +63,23 @@ class CartServiceClient
     {
         try {
             $response = Http::timeout(5)
-                ->delete($this->baseUrl() . '/carts/' . $userId);
+                ->delete($this->baseUrl().'/carts/'.$userId);
 
-            if (!$response->successful()) {
-                throw new CartServiceException(
+            if (! $response->successful()) {
+                throw new ServiceUnavailableException(
+                    'cart-service',
+                    'clear_cart',
                     'Cart Service gagal mengosongkan keranjang. HTTP '
-                    . $response->status()
+                    .$response->status()
                 );
             }
-        } catch (CartServiceException $e) {
+        } catch (ServiceUnavailableException $e) {
             throw $e;
         } catch (Throwable $e) {
-            throw new CartServiceException(
+            throw new ServiceUnavailableException(
+                'cart-service',
+                'clear_cart',
                 'Cart Service tidak dapat mengosongkan keranjang.',
-                0,
                 $e
             );
         }

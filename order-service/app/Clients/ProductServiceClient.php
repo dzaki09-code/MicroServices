@@ -3,7 +3,7 @@
 namespace App\Clients;
 
 use App\Exceptions\ProductNotFoundException;
-use App\Exceptions\ProductServiceException;
+use App\Exceptions\ServiceUnavailableException;
 use Illuminate\Support\Facades\Http;
 use Throwable;
 
@@ -28,7 +28,9 @@ class ProductServiceClient
             }
 
             if (! $response->successful()) {
-                throw new ProductServiceException(
+                throw new ServiceUnavailableException(
+                    'product-service',
+                    'get_product',
                     'Product Service gagal mengambil data produk. HTTP '
                     .$response->status()
                 );
@@ -55,16 +57,20 @@ class ProductServiceClient
                 || $stock === false
                 || $stock < 0
             ) {
-                throw new ProductServiceException(
+                throw new ServiceUnavailableException(
+                    'product-service',
+                    'get_product',
                     'Data produk dari Product Service tidak valid.'
                 );
             }
 
             return $product;
-        } catch (ProductNotFoundException|ProductServiceException $e) {
+        } catch (ProductNotFoundException|ServiceUnavailableException $e) {
             throw $e;
         } catch (Throwable $e) {
-            throw new ProductServiceException(
+            throw new ServiceUnavailableException(
+                'product-service',
+                'get_product',
                 'Product Service tidak dapat dihubungi.',
                 $e
             );

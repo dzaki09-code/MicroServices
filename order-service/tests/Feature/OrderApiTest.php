@@ -4,10 +4,9 @@ namespace Tests\Feature;
 
 use App\Clients\CartServiceClient;
 use App\Clients\ProductServiceClient;
-use App\Exceptions\CartServiceException;
-use App\Exceptions\ProductServiceException;
+use App\Exceptions\ServiceUnavailableException;
 use App\Models\Order;
-use App\Services\CheckoutService;
+use App\Services\OrderService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
@@ -56,7 +55,11 @@ class OrderApiTest extends TestCase
         $this->mock(CartServiceClient::class, function (MockInterface $mock): void {
             $mock->shouldReceive('getCart')
                 ->once()
-                ->andThrow(new CartServiceException('technical connection detail'));
+                ->andThrow(new ServiceUnavailableException(
+                    'cart-service',
+                    'get_cart',
+                    'technical connection detail'
+                ));
         });
 
         config(['app.debug' => true]);
@@ -71,7 +74,11 @@ class OrderApiTest extends TestCase
         $this->mock(CartServiceClient::class, function (MockInterface $mock): void {
             $mock->shouldReceive('getCart')
                 ->once()
-                ->andThrow(new CartServiceException('connection failed'));
+                ->andThrow(new ServiceUnavailableException(
+                    'cart-service',
+                    'get_cart',
+                    'connection failed'
+                ));
         });
 
         config(['app.debug' => false]);
@@ -104,14 +111,20 @@ class OrderApiTest extends TestCase
             $mock->shouldReceive('getProduct')
                 ->once()
                 ->with(9)
-                ->andThrow(new ProductServiceException('connection failed'));
+                ->andThrow(new ServiceUnavailableException(
+                    'product-service',
+                    'get_product',
+                    'connection failed'
+                ));
         });
 
         Log::shouldReceive('error')
             ->once()
-            ->with('Product Service gagal saat checkout.', \Mockery::on(
+            ->with('Service dependen gagal memproses request Order.', \Mockery::on(
                 fn (array $context): bool => $context['service'] === 'product-service'
-                    && $context['exception'] instanceof ProductServiceException
+                    && $context['service'] === 'product-service'
+                    && $context['operation'] === 'get_product'
+                    && $context['exception'] instanceof ServiceUnavailableException
             ));
 
         config(['app.debug' => false]);
@@ -141,7 +154,11 @@ class OrderApiTest extends TestCase
             $mock->shouldReceive('clearCart')
                 ->once()
                 ->with(42)
-                ->andThrow(new CartServiceException('service unavailable'));
+                ->andThrow(new ServiceUnavailableException(
+                    'cart-service',
+                    'clear_cart',
+                    'service unavailable'
+                ));
         });
 
         $this->mock(ProductServiceClient::class, function (MockInterface $mock): void {
@@ -157,6 +174,13 @@ class OrderApiTest extends TestCase
         });
 
         Log::shouldReceive('warning')->once();
+        Log::shouldReceive('error')
+            ->once()
+            ->with('Service dependen gagal memproses request Order.', \Mockery::on(
+                fn (array $context): bool => $context['service'] === 'cart-service'
+                    && $context['operation'] === 'clear_cart'
+                    && $context['exception'] instanceof ServiceUnavailableException
+            ));
         config(['app.debug' => false]);
 
         $this->postJson('/orders', ['user_id' => 42])
@@ -300,7 +324,7 @@ class OrderApiTest extends TestCase
 
     public function test_unexpected_api_errors_do_not_expose_internal_details(): void
     {
-        $this->mock(CheckoutService::class, function (MockInterface $mock): void {
+        $this->mock(OrderService::class, function (MockInterface $mock): void {
             $mock->shouldReceive('checkout')
                 ->once()
                 ->andThrow(new \RuntimeException('private database detail'));

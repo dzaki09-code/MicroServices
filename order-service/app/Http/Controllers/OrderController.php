@@ -2,15 +2,13 @@
 
 namespace App\Http\Controllers;
 
-use App\Exceptions\CartServiceException;
 use App\Exceptions\OrderBusinessException;
-use App\Exceptions\OrderNotFoundException;
 use App\Exceptions\OrderNotPayableException;
-use App\Exceptions\ProductServiceException;
+use App\Exceptions\ServiceUnavailableException;
 use App\Http\Requests\StoreOrderRequest;
 use App\Http\Requests\UserOrdersRequest;
-use App\Services\CheckoutService;
 use App\Services\OrderService;
+use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Facades\Log;
 use Throwable;
@@ -20,7 +18,7 @@ class OrderController extends Controller
     public function health(): JsonResponse
     {
         return response()->json([
-            'status' => 'ok',
+            'status' => 'Order service berjalan dengan baik',
             'service' => 'order-service',
         ]);
     }
@@ -39,10 +37,10 @@ class OrderController extends Controller
 
     public function store(
         StoreOrderRequest $request,
-        CheckoutService $checkoutService
+        OrderService $orderService
     ): JsonResponse {
         try {
-            $order = $checkoutService->checkout(
+            $order = $orderService->checkout(
                 (int) $request->validated('user_id')
             );
 
@@ -101,7 +99,7 @@ class OrderController extends Controller
 
     private function exceptionResponse(Throwable $exception): JsonResponse
     {
-        if ($exception instanceof OrderNotFoundException) {
+        if ($exception instanceof ModelNotFoundException) {
             return response()->json([
                 'message' => 'Pesanan tidak ditemukan.',
                 'data' => null,
@@ -123,20 +121,13 @@ class OrderController extends Controller
             ], 409);
         }
 
-        if ($exception instanceof ProductServiceException) {
-            Log::error('Product Service gagal saat checkout.', [
-                'service' => 'product-service',
+        if ($exception instanceof ServiceUnavailableException) {
+            Log::error('Service dependen gagal memproses request Order.', [
+                'service' => $exception->service,
+                'operation' => $exception->operation,
                 'exception' => $exception,
             ]);
 
-            return response()->json([
-                'message' => $this->serviceErrorMessage($exception),
-                'data' => null,
-                'errors' => null,
-            ], 503);
-        }
-
-        if ($exception instanceof CartServiceException) {
             return response()->json([
                 'message' => $this->serviceErrorMessage($exception),
                 'data' => null,
