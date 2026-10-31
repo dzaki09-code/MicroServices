@@ -24,7 +24,9 @@ flowchart LR
 ## Clone dan jalankan seluruh sistem
 
 Prasyarat: Git, Docker Desktop atau Docker Engine, dan Docker Compose v2.
-Jalankan dari terminal (Windows: PowerShell atau Git Bash):
+Perintah `docker compose` bisa dijalankan dari PowerShell atau Git Bash. Contoh
+`curl` di README memakai sintaks Bash; di Windows jalankan contoh tersebut dari
+Git Bash atau WSL, karena `curl` di Windows PowerShell memiliki sintaks berbeda.
 
 ```sh
 git clone https://github.com/dzaki09-code/MicroServices.git
@@ -49,6 +51,21 @@ menginisialisasi tabel dan tiga produk contoh ketika volume database pertama
 kali dibuat. Log: `docker compose logs -f [nama-service]`. Matikan stack tanpa
 menghapus data dengan `docker compose down`; `docker compose down -v`
 menghapus seluruh volume database.
+
+### UI (opsional)
+
+UI React/Vite tidak termasuk Compose dan saat ini hanya berupa halaman demo,
+belum terhubung ke API. Untuk menjalankannya terpisah, gunakan Node.js
+`^20.19.0` atau `>=22.12.0` dan jalankan dari root repository:
+
+```sh
+cd ecommerce-ui
+npm ci
+npm run dev -- --host 0.0.0.0
+```
+
+Buka `http://localhost:5173`. Perintah ini hanya menjalankan UI demo; backend
+tetap dijalankan melalui Docker Compose seperti langkah di atas.
 
 ## API
 
@@ -154,13 +171,14 @@ besar), `500` (kesalahan internal), `503` (service dependen).
 
 ## Environment variable
 
-Compose menetapkan variabel di bawah; clone baru tidak perlu membuat `.env`.
-Credential yang ada di `docker-compose.yml` hanya untuk demonstrasi lokal.
-Nama host database/service hanya berfungsi di network Compose.
+Compose menetapkan variabel di bawah; `PORT` Product API bersifat opsional
+(default `3000`) dan tidak ditetapkan Compose. Clone baru tidak perlu membuat
+`.env`. Credential yang ada di `docker-compose.yml` hanya untuk demonstrasi
+lokal. Nama host database/service hanya berfungsi di network Compose.
 
 | Container | Variabel |
 |---|---|
-| Product API | `PORT`, `DB_HOST`, `DB_USER`, `DB_PASSWORD`, `DB_NAME` |
+| Product API | `DB_HOST`, `DB_USER`, `DB_PASSWORD`, `DB_NAME`; `PORT` opsional (default `3000`) |
 | Product DB | `MYSQL_DATABASE`, `MYSQL_USER`, `MYSQL_PASSWORD`, `MYSQL_ROOT_PASSWORD` |
 | Cart API | `DB_CONNECTION`, `DB_HOST`, `DB_PORT`, `DB_DATABASE`, `DB_USERNAME`, `DB_PASSWORD`, `PRODUCTS_SERVICE_URL`, `LOG_CHANNEL` |
 | Cart DB | `POSTGRES_DB`, `POSTGRES_USER`, `POSTGRES_PASSWORD` |
