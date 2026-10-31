@@ -138,6 +138,11 @@ class OrderController extends Controller
         }
 
         if ($exception instanceof ProductServiceException) {
+            Log::error('Product Service gagal saat checkout.', [
+                'service' => 'product-service',
+                'exception' => $exception,
+            ]);
+
             return response()->json([
                 'message' => $this->serviceErrorMessage($exception),
                 'data' => null,

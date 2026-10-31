@@ -5,6 +5,7 @@ namespace Tests\Feature;
 use App\Clients\CartServiceClient;
 use App\Clients\ProductServiceClient;
 use App\Exceptions\CartServiceException;
+use App\Exceptions\ProductServiceException;
 use App\Models\Order;
 use App\Services\CheckoutService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -72,6 +73,46 @@ class OrderApiTest extends TestCase
                 ->once()
                 ->andThrow(new CartServiceException('connection failed'));
         });
+
+        config(['app.debug' => false]);
+
+        $this->postJson('/orders', ['user_id' => 42])
+            ->assertServiceUnavailable()
+            ->assertJsonPath(
+                'message',
+                'Service terkait tidak dapat dihubungi, coba lagi nanti.'
+            )
+            ->assertJsonPath('data', null)
+            ->assertJsonPath('errors', null);
+    }
+
+    public function test_unavailable_product_service_is_logged_and_returns_service_unavailable(): void
+    {
+        $this->mock(CartServiceClient::class, function (MockInterface $mock): void {
+            $mock->shouldReceive('getCart')
+                ->once()
+                ->with(42)
+                ->andReturn([
+                    'user_id' => 42,
+                    'items' => [
+                        ['product_id' => 9, 'quantity' => 1],
+                    ],
+                ]);
+        });
+
+        $this->mock(ProductServiceClient::class, function (MockInterface $mock): void {
+            $mock->shouldReceive('getProduct')
+                ->once()
+                ->with(9)
+                ->andThrow(new ProductServiceException('connection failed'));
+        });
+
+        Log::shouldReceive('error')
+            ->once()
+            ->with('Product Service gagal saat checkout.', \Mockery::on(
+                fn (array $context): bool => $context['service'] === 'product-service'
+                    && $context['exception'] instanceof ProductServiceException
+            ));
 
         config(['app.debug' => false]);
 

@@ -37,14 +37,14 @@ transaksi database; status pembayaran mengubah `PENDING` menjadi `PAID`.
 
 | Method | Endpoint | Hasil utama |
 |---|---|---|
-| GET | `/api/health` | `200`, status service |
-| POST | `/api/orders` | `201`, membuat order dari cart |
-| GET | `/api/orders/{id}` | `200`, detail order; `404` jika tidak ditemukan |
-| GET | `/api/orders/user/{userId}?status=PENDING` | `200`; `422` untuk filter tidak valid |
-| PATCH | `/api/orders/{id}/pay` | `200`; `404` jika tidak ada; `409` jika status bukan `PENDING` |
+| GET | `/health` | `200`, status service |
+| POST | `/orders` | `201`, membuat order dari cart |
+| GET | `/orders/{id}` | `200`, detail order; `404` jika tidak ditemukan |
+| GET | `/orders/user/{userId}?status=PENDING` | `200`; `422` untuk filter tidak valid |
+| PATCH | `/orders/{id}/pay` | `200`; `404` jika tidak ada; `409` jika status bukan `PENDING` |
 
-Checkout menghasilkan `400` jika cart kosong, produk tidak ditemukan, data
+Checkout menghasilkan `409` jika cart kosong, produk tidak ditemukan, data
 cart tidak valid, atau stok tidak mencukupi; `503` jika Cart/Product Service
 tidak tersedia; dan `500` untuk kesalahan internal. Validasi request memakai
 `422`. Respons error API berisi `message`, `data`, dan `errors`; detail error
-internal dicatat di log dan tidak dikirim ke client.
+internal hanya dikirim saat debug aktif dan selalu dicatat di log.
