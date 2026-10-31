@@ -4,27 +4,33 @@ namespace App\Http\Controllers;
 
 use App\Exceptions\CartServiceException;
 use App\Exceptions\OrderBusinessException;
+use App\Exceptions\OrderNotFoundException;
+use App\Exceptions\OrderNotPayableException;
 use App\Exceptions\ProductServiceException;
 use App\Http\Requests\StoreOrderRequest;
 use App\Http\Requests\UserOrdersRequest;
-use App\Models\Order;
 use App\Services\CheckoutService;
+use App\Services\OrderService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Facades\Log;
 use Throwable;
 
 class OrderController extends Controller
 {
-    public function index(): JsonResponse
+    public function health(): JsonResponse
+    {
+        return response()->json([
+            'status' => 'ok',
+            'service' => 'order-service',
+        ]);
+    }
+
+    public function index(OrderService $orderService): JsonResponse
     {
         try {
-            $orders = Order::with('items')
-                ->latest()
-                ->get();
-
             return response()->json([
                 'message' => 'Daftar pesanan berhasil diambil.',
-                'data' => $orders,
+                'data' => $orderService->listOrders(),
             ]);
         } catch (Throwable $e) {
             return $this->exceptionResponse($e);
@@ -49,21 +55,12 @@ class OrderController extends Controller
         }
     }
 
-    public function show(int $id): JsonResponse
+    public function show(int $id, OrderService $orderService): JsonResponse
     {
         try {
-            $order = Order::with('items')->find($id);
-
-            if (! $order) {
-                return response()->json([
-                    'message' => 'Pesanan tidak ditemukan.',
-                    'data' => null,
-                ], 404);
-            }
-
             return response()->json([
                 'message' => 'Detail pesanan berhasil diambil.',
-                'data' => $order,
+                'data' => $orderService->getOrder($id),
             ]);
         } catch (Throwable $e) {
             return $this->exceptionResponse($e);
@@ -72,55 +69,30 @@ class OrderController extends Controller
 
     public function userOrders(
         UserOrdersRequest $request,
-        int $userId
+        int $userId,
+        OrderService $orderService
     ): JsonResponse {
         try {
             $validated = $request->validated();
 
-            $query = Order::with('items')
-                ->where('user_id', $userId)
-                ->latest();
-
-            if (isset($validated['status'])) {
-                $query->where('status', $validated['status']);
-            }
-
             return response()->json([
                 'message' => 'Daftar pesanan berhasil diambil.',
-                'data' => $query->get(),
+                'data' => $orderService->getUserOrders(
+                    $userId,
+                    $validated['status'] ?? null
+                ),
             ]);
         } catch (Throwable $e) {
             return $this->exceptionResponse($e);
         }
     }
 
-    public function pay(int $id): JsonResponse
+    public function pay(int $id, OrderService $orderService): JsonResponse
     {
         try {
-            $order = Order::with('items')->find($id);
-
-            if (! $order) {
-                return response()->json([
-                    'message' => 'Pesanan tidak ditemukan.',
-                    'data' => null,
-                ], 404);
-            }
-
-            if ($order->status !== 'PENDING') {
-                return response()->json([
-                    'message' => 'Hanya pesanan berstatus PENDING yang dapat dibayar.',
-                    'data' => $order,
-                ], 409);
-            }
-
-            $order->update([
-                'status' => 'PAID',
-                'payment_status' => 'paid',
-            ]);
-
             return response()->json([
                 'message' => 'Pembayaran berhasil.',
-                'data' => $order->fresh('items'),
+                'data' => $orderService->pay($id),
             ], 200);
         } catch (Throwable $e) {
             return $this->exceptionResponse($e);
@@ -129,6 +101,20 @@ class OrderController extends Controller
 
     private function exceptionResponse(Throwable $exception): JsonResponse
     {
+        if ($exception instanceof OrderNotFoundException) {
+            return response()->json([
+                'message' => 'Pesanan tidak ditemukan.',
+                'data' => null,
+            ], 404);
+        }
+
+        if ($exception instanceof OrderNotPayableException) {
+            return response()->json([
+                'message' => $exception->getMessage(),
+                'data' => $exception->order,
+            ], 409);
+        }
+
         if ($exception instanceof OrderBusinessException) {
             return response()->json([
                 'message' => $exception->getMessage(),

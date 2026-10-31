@@ -245,6 +245,41 @@ class OrderApiTest extends TestCase
             ->assertJsonPath('data', null);
     }
 
+    public function test_order_read_endpoints_return_orders_and_apply_user_filters(): void
+    {
+        $pendingOrder = Order::create([
+            'user_id' => 42,
+            'total_amount' => 25,
+            'status' => 'PENDING',
+            'payment_status' => 'unpaid',
+        ]);
+        Order::create([
+            'user_id' => 42,
+            'total_amount' => 30,
+            'status' => 'PAID',
+            'payment_status' => 'paid',
+        ]);
+        Order::create([
+            'user_id' => 7,
+            'total_amount' => 10,
+            'status' => 'PENDING',
+            'payment_status' => 'unpaid',
+        ]);
+
+        $this->getJson('/orders')
+            ->assertOk()
+            ->assertJsonCount(3, 'data');
+
+        $this->getJson("/orders/{$pendingOrder->id}")
+            ->assertOk()
+            ->assertJsonPath('data.id', $pendingOrder->id);
+
+        $this->getJson('/orders/user/42?status=PENDING')
+            ->assertOk()
+            ->assertJsonCount(1, 'data')
+            ->assertJsonPath('data.0.status', 'PENDING');
+    }
+
     public function test_payment_changes_pending_order_to_paid_and_rejects_repayment(): void
     {
         $order = Order::create([
