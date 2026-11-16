@@ -21,9 +21,9 @@ export default function ProductListPage() {
       <div className="hero">
         <div className="hero-content">
           <h1>
-            Temukan Gadget<br />Impianmu
+            Temukan <br />Gear Terbaik Untuk Setup-mu
           </h1>
-          <p>Laptop, HP, Aksesoris — semua ada di GadgetHub</p>
+          <p>Laptop, HP, Aksesoris — semua ada di NexTech</p>
         </div>
       </div>
 

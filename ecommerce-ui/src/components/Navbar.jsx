@@ -8,7 +8,7 @@ export default function Navbar({ userId, onUserChange, cartCount }) {
     <header className="navbar">
       <div className="navbar-left">
         <NavLink to="/" className="navbar-brand">
-          ⚡ GadgetHub
+          ⚡ NexTech
         </NavLink>
 
         <nav className="navbar-links">
